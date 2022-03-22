@@ -11,14 +11,22 @@ python venv -m path/to/virtual/environment
 
 ```
 
-### 2. Install dependencies
+### 2. Activate virtual environment
+
+```bash
+
+cd venv_name/Scripts && activate
+```
+
+### 3. Install dependencies
 
 ```bash
 
 pip install -r requirements.txt
 ```
 
-### 3. Run python script
+
+### 4. Run python script
 To run the script properly you have to provide sheet title and your full name:
 
 ```bash
