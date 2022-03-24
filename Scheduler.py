@@ -8,10 +8,27 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 class Scheduler:
-    def __init__(self, sheet_name, person, version='v1'):
+    ''' 
+        Scheduler object for extracting workshifts from Google Sheets shift plan and creating corresponding events in Google Calendar.\n
+        To make it works correctly you have to provide 
+            - `Service Account` credentials in JSON (Google Sheets)
+            - `OAuth Client ID` credentials in JSON (Google Calendar)
+        
+        Scheduler logic was implemented in two ways: sensitive for letters with accents (`'v2'`) and insensitive ('`v1`'). In case of use scheduler version 2 
+        user must enter full name with attention to special characters.
+
+        Args:
+        sheet_name: string
+            The title of Google Sheet to work with.
+        worker: string
+            The full name of worker whose workshifts to extract.
+        version: string, (Optional) 
+            Version of the Scheduler to use; default: `v1`.
+    '''
+    def __init__(self, sheet_name: str, worker: str, version='v1'):
         self.version = version
         self.sheet_name = sheet_name
-        self.person = '.'.join([person.split(' ')[0][0], self.remove_accents(person.split(' ')[1]).capitalize()])
+        self.worker = self.to_short(worker)
         self.days_mapper = {
             0: ['A', 'B'], 
             1: ['C', 'D'], 
@@ -23,7 +40,7 @@ class Scheduler:
     
     @staticmethod
     def remove_accents(text: str):
-        '''  Replace latin polish letters with accents with common ones'''
+        '''  Replace latin polish letters including accents with common ones'''
         letter_mapper = {'ś': 's', 'ą': 'a', 'ć': 'c', 'ę': 'e', 'ó': 'o', 'ł': 'l', 'ń': 'n', 'ź': 'z', 'ż': 'z'}
         text = text.lower()
         for letter in letter_mapper.keys():
@@ -31,15 +48,20 @@ class Scheduler:
                 text = text.replace(letter, letter_mapper[letter])
         return text
 
+    @staticmethod
+    def to_short(full_name: str):
+        ''' Return person name in J. Doe format '''
+        f_name, l_name = full_name.split(' ')[0][0], full_name.split(' ')[1]
+        short = '. '.join([f_name, l_name])
+        return short
+
     def clean_record(self, value: str):
         ''' Clean values to extract first and last name in specific format '''
         value = value.replace(' ', '').replace('PLAKATY', '')
         if len(value) > 1:
             if '/' in value:
                 value = value.split('/')[1]
-            fname, lname = value.split('.')
-            lname = self.remove_accents(lname)
-            return '.'.join([fname, lname.capitalize()])
+            return self.remove_accents(value)
         return value
 
     def load_sheet(self):
@@ -140,8 +162,9 @@ class Scheduler:
 
     def get_workshifts(self):
         ''' Return list of dicts representing particular shift including date and hours '''
-        print(f'Extracting "{self.person}" workshifts...')
+        print(f'Extracting "{self.worker}" workshifts...')
         workshifts = []
+        worker = self.remove_accents(self.worker).replace(' ', '')
         for key, value in self.days_mapper.items():
             shift = {}
             range1 = value[-1] + '7:' + value[-1] + '15'
@@ -149,9 +172,9 @@ class Scheduler:
             customer_service = [self.clean_record(name) for sublist in self.sheet.values_get(range1)['values'] for name in sublist]  # flatten the list of names
             ticket_agent = [self.clean_record(name) for sublist in self.sheet.values_get(range2)['values'] for name in sublist] # flatten the list of names
             employees = customer_service + ticket_agent
-            if self.person in employees:
+            if worker in employees:
                 shift['date'] = self.dates[key]
-                shift['hours'] = self.hours[key][employees.index(self.person)]
+                shift['hours'] = self.hours[key][employees.index(worker)]
                 workshifts.append(shift)
         return workshifts
 
@@ -176,9 +199,9 @@ class Scheduler:
     def get_workshifts_v2(self):
         ''' Return list of cell objects matching given value including row number and column number '''
         print('Extracting workshifts...')
-        normal = self.sheet.findall('K. Styś')
-        outlier = [self.sheet.find('K. Styś PLAKATY')]
-        workshifts = outlier + normal if outlier else normal 
+        normal = self.sheet.findall(self.worker)
+        outlier = self.sheet.find(self.worker + ' PLAKATY')
+        workshifts = [outlier] + normal if outlier else normal 
         return workshifts
 
     def get_hours_v2(self):
