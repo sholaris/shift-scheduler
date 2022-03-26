@@ -33,10 +33,10 @@ To run the script properly you have to provide sheet title and your full name:
 
 python main.py
 
-Input sheet name:
+Enter spredsheet name:
 YOUR SHEET NAME
 
-Input full name:
+Enter your full name:
 YOUR FULL NAME
 
 ```
