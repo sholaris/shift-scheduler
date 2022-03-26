@@ -130,19 +130,19 @@ class Scheduler:
                 }
             }
 
-# First version of helper functions (less error prone)
+# First version of helper functions (special chars insensitive)
     def get_dates(self):
         ''' Return list of dates from the worksheet converted to "YYYY-mm-dd" format '''
         print('Extracting dates...')
-        raw_dates = self.sheet.values_get('PT-CZW')['values'][4]
+        ws = self.sheet.worksheet('PT-CZW')
+        raw_dates = ws.row_values(5)
         raw_dates = list(filter(lambda date: len(date) > 0, raw_dates))
         dates = []
         for date in raw_dates:
             date = date.split(' ')
             date.append(str(datetime.now().date().year))
             date = '-'.join(date)
-            date = datetime.strptime(date, "%d-%b-%Y").date()
-            date = date.strftime("%Y-%m-%d")
+            date = datetime.strptime(date, "%d-%b-%Y").date().strftime("%Y-%m-%d")
             dates.append(date)
         return dates
 
@@ -150,14 +150,14 @@ class Scheduler:
         ''' Return list of lists of start and end hours from worksheet converted to datetime format '''
         print('Extracting hours...')
         hours = []
+        ws = self.sheet.worksheet('PT-CZW')
         for values in self.days_mapper.values():
             range1 = values[0] + '7:' + values[0] + '15'
             range2 = values[0] + '24:' + values[0] + '31'
-            customer_service = [list(map(lambda hour: datetime.strptime(hour + ':00', '%H:%M:%S').time(), hour[:11].replace(" ", "").replace(
-                ".", ":").replace('24', '00').split('-'))) for sublist in self.sheet.values_get(range1)['values'] for hour in sublist]
-            ticket_agent = [list(map(lambda hour: datetime.strptime(hour + ":00", '%H:%M:%S').time(), hour[:11].replace(" ", "").replace(
-                ".", ":").replace('24', '00').split('-'))) for sublist in self.sheet.values_get(range2)['values'] for hour in sublist]
+            customer_service = ws.get(range1, major_dimension='COLUMNS')[0]
+            ticket_agent = ws.get(range2, major_dimension='COLUMNS')[0]
             hours.append(customer_service + ticket_agent)
+        hours = [[list(map(lambda hour: hour + ':00', hour[:11].replace(' ', '').replace('.', ':').replace('24', '00').split('-'))) for hour in sublist] for sublist in hours]
         return hours
 
     def get_workshifts(self):
@@ -165,37 +165,36 @@ class Scheduler:
         print(f'Extracting "{self.worker}" workshifts...')
         workshifts = []
         worker = self.remove_accents(self.worker).replace(' ', '')
+        ws = self.sheet.worksheet('PT-CZW')
         for key, value in self.days_mapper.items():
-            shift = {}
             range1 = value[-1] + '7:' + value[-1] + '15'
             range2 = value[-1] + '24:' + value[-1] + '31'
-            customer_service = [self.clean_record(name) for sublist in self.sheet.values_get(range1)['values'] for name in sublist]  # flatten the list of names
-            ticket_agent = [self.clean_record(name) for sublist in self.sheet.values_get(range2)['values'] for name in sublist] # flatten the list of names
+            customer_service = [self.clean_record(name) for sublist in ws.get(range1) for name in sublist]  # flatten the list of names
+            ticket_agent = [self.clean_record(name) for sublist in ws.get(range2) for name in sublist] # flatten the list of names
             employees = customer_service + ticket_agent
             if worker in employees:
-                shift['date'] = self.dates[key]
-                shift['hours'] = self.hours[key][employees.index(worker)]
+                shift = [self.dates[key], self.hours[key][employees.index(worker)]]
                 workshifts.append(shift)
         return workshifts
 
-    def add_event(self, shift):
+    def add_event(self, shift: list):
         ''' Insert event to the calendar with use of Google Calendar API '''
         print('Adding event...')
         title = 'Praca'
         location = 'Kino Nowe Horyzonty Kazimierza Wielkiego 19, 50-077 Wrocław, Polska'
         
-        start = shift['date'] + 'T' + shift['hours'][0].strftime('%H:%M:%S')
-        if shift['hours'][1].hour == 0:
-            shift['date'] = shift['date'][:-2] + str(int(shift['date'][-2:]) + 1)
+        start = shift[0] + 'T' + shift[1][0]
+        if shift[1][1][:2] == '00':
+            shift[0] = shift[0][:-2] + str(int(shift[0][-2:]) + 1)
 
-        end = shift['date'] + 'T' + shift['hours'][1].strftime('%H:%M:%S')
+        end = shift[0] + 'T' + shift[1][1]
         event = self.create_event(title, location, start, end)
         try:
             self.GOOGLE_CALENDAR_API.events().insert(calendarId='primary', body=event).execute()
         except HttpError as error:
             print('An error occurred: ', error)
   
-# Second version of helper functions (more error prone)
+# Second version of helper functions (special chars sensitive)
     def get_workshifts_v2(self):
         ''' Return list of cell objects matching given value including row number and column number '''
         print('Extracting workshifts...')
@@ -235,7 +234,6 @@ class Scheduler:
             date = date[:-2] + str(int(date[-2:]) + 1)    
         end = date + 'T' + hours[1]
         event = self.create_event(title, location, start, end)
-
         try:
             self.GOOGLE_CALENDAR_API.events().insert(calendarId='primary', body=event).execute()
         except HttpError as error:
@@ -252,8 +250,8 @@ class Scheduler:
                 self.add_event_v2(self.dates[i], self.hours[i])
         else:
             self.sheet = self.load_sheet()
-            self.hours = self.get_hours()
             self.dates = self.get_dates()
+            self.hours = self.get_hours()
             self.workshifts = self.get_workshifts()
             for event in self.workshifts:
                 self.add_event(event)
