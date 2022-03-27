@@ -1,8 +1,9 @@
 from datetime import datetime
 from os import path
-import pickle
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -80,20 +81,23 @@ class Scheduler:
     def get_cred():
         ''' Get credentials to Google Calendar API from JSON file. If doesn exists open a console with link to authorization page '''
         credentials = None
-        if path.exists('token.pkl'):
-            credentials = pickle.load(open("token.pkl", "rb"))
-        else:
-            scopes = [
+        scopes = [
                 "https://www.googleapis.com/auth/calendar",
                 "https://www.googleapis.com/auth/calendar.events"
                 ]
+        if path.exists('token.json'):
+            credentials = Credentials.from_authorized_user_file('token.json', scopes)
+        if not credentials or not credentials.valid:
+            if credentials and credentials.expired and credentials.refresh_token:
+                credentials.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    "client_secret.json", scopes)
 
-            flow = InstalledAppFlow.from_client_secrets_file(
-                "client_secret.json", scopes)
+                credentials = flow.run_console()
 
-            credentials = flow.run_console()
-
-            pickle.dump(credentials, open("token.pkl", "wb"))
+                with open('token.json', 'w') as token:
+                    token.write(credentials.to_json())
 
         return credentials
 
