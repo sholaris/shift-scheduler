@@ -1,39 +1,12 @@
 # workshift-scheduler
 
-Simple script that scrap workshift hours from Google Sheets, convert them and
+Simple script that scrap workshift hours from Google Sheets, process them and
 create corresponding events in Google Calendar.
 
 ## Credentials
 
-This script use Service Account credentials to authenticate in Google Workspace
-for reading Google Sheets and OAuth2 Client ID credentials for inserting events
-in Google Calendar.
-
-### **Create service account**
-
----
-
-1. Open the **Google Cloud Console**.
-2. At the top left, click Menu > **IAM & Admin** > **Service Account**.
-3. Click **Create service account**.
-4. Fill in the service account details, then click **Create and continue**.
-5. Click **Continue**.
-6. Click **Done**.
-
-### **Create credentials for a service account**
-
----
-
-1. Open the **Google Cloud Console**.
-2. At the top left, click Menu > **IAM & Admin > Service Account**.
-3. Select your service account.
-4. Click **Keys > Add keys > Create new key**.
-5. Select **JSON**, then click **Create**.
-
-   _Your new public/private key pair is generated and downloaded to your machine
-   as a new file. Move it to your project directory._
-
-6. Click **Close**.
+This script use OAuth2 Client ID credentials for reading data from Google Sheets
+and inserting events in Google Calendar.
 
 ### **OAuth client ID credentials**
 
@@ -62,6 +35,8 @@ in Google Calendar.
    IDs".
 
 ## Quickstart
+
+---
 
 ### 1. Create Virtual Environment
 
@@ -95,12 +70,13 @@ Enter your full name:
 
 ### 5. (Optional) Provide authorize token for Google Calendar
 
-You need to login with your google account and copy generated authorize code
-while running script for the first time:
+During the first run you have to login with your google account and grant access
+to services needed. Next, copy generated authorize code and paste it into the
+console:
 
 ```bash
 Enter the authorization code: <GENERATED CODE>
 ```
 
-After that JSON file containing token will be created and used in other script
+Corresponding access token will be saved in JSON file and used in other script
 runs.

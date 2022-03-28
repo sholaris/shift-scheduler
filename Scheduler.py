@@ -1,7 +1,6 @@
 from datetime import datetime
 from os import path
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -11,12 +10,14 @@ from googleapiclient.errors import HttpError
 class Scheduler:
     ''' 
         Scheduler object for extracting workshifts from Google Sheets shift plan and creating corresponding events in Google Calendar.\n
-        To make it works correctly you have to provide 
-            - `Service Account` credentials in JSON (Google Sheets)
-            - `OAuth Client ID` credentials in JSON (Google Calendar)
-        
-        Scheduler logic was implemented in two ways: sensitive for letters with accents (`'v2'`) and insensitive ('`v1`'). In case of use scheduler version 2 
-        user must enter full name with attention to special characters.
+        It use `OAuth Client ID` credentials to authenticate action in particular scopes. To make it works correctly you have to grant access 
+        to your sheets, drive and calendar data. 
+
+        Scheduler logic was implemented in two ways: 
+        - sensitive for letters with accents (`'v2'`) and 
+        - insensitive ('`v1`').
+
+        (Warning) In case of use scheduler version 2 user must enter full name with attention to special characters.
 
         Args:
         sheet_name: string
@@ -66,24 +67,22 @@ class Scheduler:
         return value
 
     def load_sheet(self):
-        ''' Authorize service account using credential from JSON file and open spredsheet of given title '''
+        ''' Authorize user to Google Sheets API using credential from JSON file and open spredsheet of given title '''
         print(f'Loading "{self.sheet_name}" from Google Sheets...')
-        scopes = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"
-        ]
-        credentials = ServiceAccountCredentials.from_json_keyfile_name("cred.json", scopes)
+        credentials = self.get_cred()
         file = gspread.authorize(credentials)
         sheet = file.open(self.sheet_name)
         return sheet
 
     @staticmethod
     def get_cred():
-        ''' Get credentials to Google Calendar API from JSON file. If doesn exists open a console with link to authorization page '''
+        ''' Get credentials to Google Sheets & Google Calendar APIs from JSON file. If doesn't exists open a console with link to user consent screen. '''
         credentials = None
         scopes = [
                 "https://www.googleapis.com/auth/calendar",
-                "https://www.googleapis.com/auth/calendar.events"
+                "https://www.googleapis.com/auth/calendar.events",
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive"
                 ]
         if path.exists('token.json'):
             credentials = Credentials.from_authorized_user_file('token.json', scopes)
@@ -151,7 +150,7 @@ class Scheduler:
         return dates
 
     def get_hours(self):
-        ''' Return list of lists of start and end hours from worksheet converted to datetime format '''
+        ''' Return list of lists including start and end hours from worksheet '''
         print('Extracting hours...')
         hours = []
         ws = self.sheet.worksheet('PT-CZW')
@@ -165,7 +164,7 @@ class Scheduler:
         return hours
 
     def get_workshifts(self):
-        ''' Return list of dicts representing particular shift including date and hours '''
+        ''' Return list of lists representing particular workshift including date and hours '''
         print(f'Extracting "{self.worker}" workshifts...')
         workshifts = []
         worker = self.remove_accents(self.worker).replace(' ', '')
@@ -244,6 +243,7 @@ class Scheduler:
             print('An error occurred: ', error)
 
     def execute(self):
+        ''' Execute Scheduler logic depending on version declared. '''
         self.api_build()    
         if self.version == 'v2':
             self.sheet = self.load_sheet().worksheet('PT-CZW')
