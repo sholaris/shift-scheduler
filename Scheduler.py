@@ -183,8 +183,8 @@ class Scheduler:
     def add_event(self, shift: list):
         ''' Insert event to the calendar with use of Google Calendar API '''
         print('Adding event...')
-        title = 'Praca'
-        location = 'Kino Nowe Horyzonty Kazimierza Wielkiego 19, 50-077 Wrocław, Polska'
+        title = '<YOUR TITLE>'
+        location = '<YOUR LOCATION>'
         
         start = shift[0] + 'T' + shift[1][0]
         if shift[1][1][:2] == '00':
@@ -229,8 +229,8 @@ class Scheduler:
     def add_event_v2(self, date: str, hours: list):
         ''' Insert event to the calendar with use of Google Calendar API '''
         print('Adding event...')
-        title = 'Praca'
-        location = 'Kino Nowe Horyzonty Kazimierza Wielkiego 19, 50-077 Wrocław, Polska'
+        title = '<YOUR TITLE>'
+        location = '<YOUR LOCATION>'
 
         start = date + 'T' + hours[0]
         if hours[1][:2] == '00':
